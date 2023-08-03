@@ -2,106 +2,84 @@ package main
 
 import (
 	"fmt"
+	"github.com/rivo/tview"
 	"log"
 	"os/exec"
 	"strings"
 )
 
-// TODO: Abstract all of that to run in go routines so it loads all of the data at once
 // TODO: Check if docker is installed, if not, throw an error
+// TODO: Add a terminal UI to interact with the data
 
-type DockerContainer struct {
-	ContainerId string
-	Image       string
-	Command     string
-	Created     string
-	Status      string
-	Ports       string
-	Names       string
-}
-
-type DockerImage struct {
-	Repository string
-	Tag        string
-	ImageId    string
-	Created    string
-	Size       string
-}
+var (
+	dockerImages     chan []DockerImage
+	dockerContainers chan []DockerContainer
+	dockerNetworks   chan []DockerNetwork
+)
 
 func init() {
 	if !checkDockerIsInstalled() {
 		log.Fatal("Docker is not installed, please install docker")
 		return
 	}
+
+	dockerImages = make(chan []DockerImage, 1)
+	dockerContainers = make(chan []DockerContainer, 1)
+	dockerNetworks = make(chan []DockerNetwork, 1)
+}
+
+func executeCommand(command string, args ...string) (string, error) {
+	cmd := exec.Command(command, args...)
+	out, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(out), err
 }
 
 func main() {
-	ps := exec.Command("docker", "ps", "-a")
-	cout, err := ps.Output()
-	if err != nil {
-		println(err.Error())
-		return
+
+	CallRoutines()
+
+	box := tview.NewBox().SetBorder(true).SetTitle("Docker CLI")
+	if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
+
+		// TODO: Check how to load the data on the terminal UI
+
+		println("Docker Images")
+		dockerImages := <-dockerImages
+		fmt.Println(dockerImages)
+
+		println("Docker Containers")
+		dockerContainers := <-dockerContainers
+		fmt.Println(dockerContainers)
+
+		println("Docker Networks")
+		dockerNetworks := <-dockerNetworks
+		fmt.Println(dockerNetworks)
+		panic(err)
 	}
-	// println(string(out))
-
-	images := exec.Command("docker", "images")
-	iout, err := images.Output()
-	if err != nil {
-		println(err.Error())
-		return
-	}
-
-	dockerContainer := []DockerContainer{}
-	dockerImages := []DockerImage{}
-
-	lines := strings.Split(string(cout), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if fields[0] == "CONTAINER" {
-			continue
-		}
-		container := DockerContainer{
-			ContainerId: fields[0],
-			Image:       fields[1],
-			Command:     fields[2],
-			Created:     fields[3],
-			Status:      fields[4],
-			Ports:       fields[5],
-			Names:       fields[6],
-		}
-		dockerContainer = append(dockerContainer, container)
-	}
-
-	lines = strings.Split(string(iout), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if fields[0] == "REPOSITORY" {
-			continue
-		}
-		image := DockerImage{
-			Repository: fields[0],
-			Tag:        fields[1],
-			ImageId:    fields[2],
-			Created:    fields[3],
-			Size:       fields[4],
-		}
-		dockerImages = append(dockerImages, image)
-	}
-
-	println("Docker Containers")
-	fmt.Println(dockerContainer)
-
-	println("Docker Images")
-	fmt.Println(dockerImages)
 
 }
 
+func splitLines(s string, t Setter) []interface{} {
+	var result []interface{}
+	lines := strings.Split(s, "\n")
+	for _, line := range lines[1:] {
+		fields := strings.Fields(line)
+		if len(fields) < 1 {
+			continue
+		}
+		t.Set(fields)
+		result = append(result, t)
+	}
+	return result
+}
+
 func checkDockerIsInstalled() bool {
+	_, err := executeCommand("docker", "version")
+	if err != nil {
+		return false
+	}
 	return true
 }
