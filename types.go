@@ -1,5 +1,9 @@
 package main
 
+type IGeneric interface {
+	DockerContainer | DockerImage | DockerNetwork
+}
+
 type DockerContainer struct {
 	ContainerId string
 	Image       string

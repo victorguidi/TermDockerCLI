@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/rivo/tview"
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
 
 // TODO: Check if docker is installed, if not, throw an error
@@ -37,28 +40,79 @@ func executeCommand(command string, args ...string) (string, error) {
 	return string(out), err
 }
 
+// Populate function should accept a generic channel and a generic struct
+func populate[T IGeneric](t *tview.TextView, data <-chan []T, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for d := range data {
+		s := fmt.Sprintf("%+v", d)
+		t.SetText(s)
+	}
+}
+
 func main() {
 
 	CallRoutines()
 
-	box := tview.NewBox().SetBorder(true).SetTitle("Docker CLI")
-	if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
+	// TODO: Change the layout, is to ugly
+	// TODO: Add a terminal UI to interact with the data
+	// TODO: Add a way to refresh the data
+	// TODO: Format the data inside the boxes
 
-		// TODO: Check how to load the data on the terminal UI
+	// Create the list view to display the Docker images
+	containers := tview.NewTextView()
+	containers.SetBorder(true).SetTitle("Docker Containers")
 
-		println("Docker Images")
-		dockerImages := <-dockerImages
-		fmt.Println(dockerImages)
+	images := tview.NewTextView()
+	images.SetBorder(true).SetTitle("Docker Images")
 
-		println("Docker Containers")
-		dockerContainers := <-dockerContainers
-		fmt.Println(dockerContainers)
+	networks := tview.NewTextView()
+	networks.SetBorder(true).SetTitle("Docker Networks")
 
-		println("Docker Networks")
-		dockerNetworks := <-dockerNetworks
-		fmt.Println(dockerNetworks)
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+	go populate(containers, dockerContainers, &wg)
+	go populate(images, dockerImages, &wg)
+	go populate(networks, dockerNetworks, &wg)
+	wg.Wait()
+
+	// Create the left panel that holds the list view
+	leftPanel := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(containers, 0, 1, true).
+		AddItem(images, 0, 1, true).
+		AddItem(networks, 0, 1, true)
+
+	// Create the right panel that holds the box (your current code)
+	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox().SetBorder(true).SetTitle("Docker CLI"), 0, 1, false)
+
+	// Create the layout
+	layout := tview.NewFlex().SetDirection(tview.FlexColumn).
+		AddItem(leftPanel, 0, 2, false).
+		AddItem(rightPanel, 0, 4, false)
+
+	layout.SetBackgroundColor(tcell.ColorBlack)
+
+	// Create the application
+	app := tview.NewApplication()
+
+	// Run the application
+	if err := app.SetRoot(layout, true).Run(); err != nil {
 		panic(err)
 	}
+
+	// TODO: Check how to load the data on the terminal UI
+
+	// println("Docker Images")
+	// dockerImages := <-dockerImages
+	// fmt.Println(dockerImages)
+	//
+	// println("Docker Containers")
+	// dockerContainers := <-dockerContainers
+	// fmt.Println(dockerContainers)
+	//
+	// println("Docker Networks")
+	// dockerNetworks := <-dockerNetworks
+	// fmt.Println(dockerNetworks)
 
 }
 
