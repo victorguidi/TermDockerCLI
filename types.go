@@ -1,7 +1,7 @@
 package main
 
 type IGeneric interface {
-	DockerContainer | DockerImage | DockerNetwork
+	DockerContainer | DockerImage | DockerNetwork | DockerLogs
 }
 
 type DockerContainer struct {
@@ -27,6 +27,10 @@ type DockerNetwork struct {
 	Name      string
 	Driver    string
 	Scope     string
+}
+
+type DockerLogs struct {
+	Logs string
 }
 
 func (d *DockerContainer) Set(fields []string) {
