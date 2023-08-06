@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/victorguidi/TermDockerCLI/containers"
+	"github.com/victorguidi/TermDockerCLI/images"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -23,7 +24,6 @@ var (
 	dockerImages     chan []DockerImage
 	dockerContainers chan []DockerContainer
 	dockerNetworks   chan []DockerNetwork
-	logs             string
 )
 
 func init() {
@@ -66,28 +66,11 @@ func main() {
 
 	CallRoutines()
 
-	container := containers.ContainerUi{
-		Table:   tview.NewTable(),
-		Options: []string{"start", "stop"},
-	}
+	container := containers.NewContainerUi()
+	container.PopulateUi()
 
-	container.Table.SetBorder(true).SetTitle("Docker Containers")
-	container.Table.SetCell(0, 0, tview.NewTableCell("ID").SetTextColor(tcell.ColorYellow).SetSelectable(false))
-	container.Table.SetCell(0, 1, tview.NewTableCell("Image").SetTextColor(tcell.ColorYellow).SetSelectable(false))
-
-	container.Table.SetCell(1, 0, tview.NewTableCell("1b323bb1j").SetTextColor(tcell.ColorGreen))
-	container.Table.SetCell(1, 1, tview.NewTableCell("ubuntu").SetTextColor(tcell.ColorGreen))
-	container.Table.SetCell(2, 0, tview.NewTableCell("18kkasd12").SetTextColor(tcell.ColorGreen))
-	container.Table.SetCell(2, 1, tview.NewTableCell("arch").SetTextColor(tcell.ColorGreen))
-
-	container.Table.SetFixed(1, 1)
-	container.Table.SetSelectable(true, false)
-	container.Table.Select(1, 1)
-
-	container.Table.SetSelectedFunc(func(row, column int) {
-		containerID := container.Table.GetCell(row, 0).Text
-		logs = "Container ID: " + containerID + "\n"
-	})
+	image := images.NewImageUi()
+	image.PopulateUi()
 
 	// containers.SetBorder(true).SetTitle("Docker Containers")
 	// containers := tview.NewTextView()
@@ -107,31 +90,51 @@ func main() {
 
 	// Create the left panel that holds the list view
 	leftPanel := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(container.Table, 0, 1, true)
+		AddItem(container.Table, 0, 1, true).
+		AddItem(image.Table, 0, 1, true)
 
-	logs = "oi"
 	text := tview.NewTextView()
-	text.SetBorder(true).SetTitle("Docker Logs")
-	text.SetText(logs)
+	text.SetBorder(true).SetTitle("Docker TUI")
 	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(text, 0, 1, true)
 
 	// Create the layout
 	layout := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(leftPanel, 0, 2, true).
-		AddItem(rightPanel, 0, 4, false)
+		AddItem(rightPanel, 0, 4, true)
 
 	layout.SetBackgroundColor(tcell.ColorBlack)
 
 	// Create the application
 	app := tview.NewApplication()
 
+	// with q key we can quit the application
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyRune {
+			switch event.Rune() {
+			case 'q':
+				app.Stop()
+			}
+		}
+		return event
+	})
+
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyTab: // When Tab or Down arrow key is pressed
+			if app.GetFocus() == container.Table {
+				app.SetFocus(image.Table)
+			} else {
+				app.SetFocus(container.Table)
+			}
+		}
+		return event
+	})
+
 	// Run the application
 	if err := app.SetRoot(layout, true).Run(); err != nil {
 		panic(err)
 	}
-
-	// TODO: Check how to load the data on the terminal UI
 
 	// println("Docker Images")
 	// dockerImages := <-dockerImages
