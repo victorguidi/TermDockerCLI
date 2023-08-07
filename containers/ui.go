@@ -1,6 +1,8 @@
 package containers
 
 import (
+	"sync"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -14,7 +16,7 @@ type ContainerUi struct {
 func NewContainerUi() *ContainerUi {
 	return &ContainerUi{
 		Table:   tview.NewTable(),
-		Logs:    make(chan []byte),
+		Logs:    make(chan []byte, 100),
 		Options: []string{"start", "stop"},
 	}
 }
@@ -30,9 +32,17 @@ func (c *ContainerUi) PopulateUi(containers []DockerContainer) {
 		c.Table.SetCell(i+1, 1, tview.NewTableCell(container.Image).SetTextColor(tcell.ColorGreen))
 	}
 
-	c.Table.SetSelectedFunc(func(row, column int) {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go GetLogs(c.Logs, containers[0].ContainerId, wg)
+	wg.Wait()
+
+	c.Table.SetSelectionChangedFunc(func(row, column int) {
 		containerId := c.Table.GetCell(row, 0).Text
-		go GetLogs(c.Logs, containerId)
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		go GetLogs(c.Logs, containerId, wg)
+		wg.Wait()
 	})
 
 	c.Table.SetFixed(1, 1)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os/exec"
+	"sync"
 )
 
 type DockerContainer struct {
@@ -57,7 +58,8 @@ func (c *DockerContainer) GetAllContainers(cc chan []DockerContainer) {
 	cc <- containers
 }
 
-func GetLogs(cl chan []byte, containerId string) {
+func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {
+	defer wg.Done()
 
 	cmd := exec.Command("docker", "logs", containerId)
 
@@ -67,4 +69,5 @@ func GetLogs(cl chan []byte, containerId string) {
 	}
 
 	cl <- logs
+
 }

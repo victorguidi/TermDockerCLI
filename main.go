@@ -1,8 +1,8 @@
 package main
 
 // TODO: Change the layout, is to ugly
-// TODO: Add a way to refresh the data
-// FIX: The logs are are causing a deadlock
+// TODO: Return also the containers from ssh connection
+// TODO: Add the possibility to send commands
 
 import (
 	"log"
@@ -46,8 +46,6 @@ func main() {
 	go dockerContainer.GetAllContainers(containerChannel)
 	dcontainers := <-containerChannel // FIX: This might cause a deadlock?
 
-	go containers.GetLogs(container.Logs, dcontainers[0].ContainerId)
-
 	container.PopulateUi(dcontainers)
 	image.PopulateUi()
 
@@ -57,7 +55,15 @@ func main() {
 
 	text := tview.NewTextView()
 	text.SetBorder(true).SetTitle("Docker TUI")
-	text.SetText(string(<-container.Logs))
+
+	go func() {
+		for {
+			select {
+			case logs := <-container.Logs:
+				text.SetText(string(logs))
+			}
+		}
+	}() // This will start a loop that will wait for logs to be sent to the channel
 
 	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(text, 0, 1, true)
