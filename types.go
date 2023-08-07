@@ -1,9 +1,5 @@
 package main
 
-type IGeneric interface {
-	DockerContainer | DockerImage | DockerNetwork | DockerLogs
-}
-
 type DockerContainer struct {
 	ContainerId string
 	Image       string
@@ -22,17 +18,6 @@ type DockerImage struct {
 	Size       string
 }
 
-type DockerNetwork struct {
-	NetworkId string
-	Name      string
-	Driver    string
-	Scope     string
-}
-
-type DockerLogs struct {
-	Logs string
-}
-
 func (d *DockerContainer) Set(fields []string) {
 	d.ContainerId = fields[0]
 	d.Image = fields[1]
@@ -49,13 +34,6 @@ func (d *DockerImage) Set(fields []string) {
 	d.ImageId = fields[2]
 	d.Created = fields[3]
 	d.Size = fields[4]
-}
-
-func (d *DockerNetwork) Set(fields []string) {
-	d.NetworkId = fields[0]
-	d.Name = fields[1]
-	d.Driver = fields[2]
-	d.Scope = fields[3]
 }
 
 type Setter interface {

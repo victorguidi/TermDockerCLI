@@ -1,17 +1,13 @@
 package main
 
-// TODO: Add a terminal UI to interact with the data
 // TODO: Change the layout, is to ugly
 // TODO: Add a way to refresh the data
-// TODO: Format the data inside the boxes
-// TODO: Load the logs on separete channels
+// FIX: The logs are are causing a deadlock
 
 import (
-	"fmt"
 	"log"
 	"os/exec"
 	"strings"
-	"sync"
 
 	"github.com/victorguidi/TermDockerCLI/containers"
 	"github.com/victorguidi/TermDockerCLI/images"
@@ -21,9 +17,9 @@ import (
 )
 
 var (
-	dockerImages     chan []DockerImage
-	dockerContainers chan []DockerContainer
-	dockerNetworks   chan []DockerNetwork
+	dockerContainer = containers.NewContainer()
+	container       = containers.NewContainerUi()
+	image           = images.NewImageUi()
 )
 
 func init() {
@@ -31,10 +27,6 @@ func init() {
 		log.Fatal("Docker is not installed, please install docker")
 		return
 	}
-
-	dockerImages = make(chan []DockerImage, 1)
-	dockerContainers = make(chan []DockerContainer, 1)
-	dockerNetworks = make(chan []DockerNetwork, 1)
 }
 
 func executeCommand(command string, args ...string) (string, error) {
@@ -46,55 +38,27 @@ func executeCommand(command string, args ...string) (string, error) {
 	return string(out), err
 }
 
-// Populate function should accept a generic channel and a generic struct
-func populate[T IGeneric](t *tview.TextView, data <-chan []T, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for d := range data {
-		t.SetText(fmt.Sprintf("%v", d))
-	}
-}
-
-func getContainerLogs(containerID string) string {
-	out, err := executeCommand("docker", "logs", containerID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return out
-}
-
 func main() {
 
-	CallRoutines()
+	// CallRoutines()
 
-	container := containers.NewContainerUi()
-	container.PopulateUi()
+	containerChannel := make(chan []containers.DockerContainer)
+	go dockerContainer.GetAllContainers(containerChannel)
+	dcontainers := <-containerChannel // FIX: This might cause a deadlock?
 
-	image := images.NewImageUi()
+	go containers.GetLogs(container.Logs, dcontainers[0].ContainerId)
+
+	container.PopulateUi(dcontainers)
 	image.PopulateUi()
 
-	// containers.SetBorder(true).SetTitle("Docker Containers")
-	// containers := tview.NewTextView()
-	//
-	// images := tview.NewTextView()
-	// images.SetBorder(true).SetTitle("Docker Images")
-	//
-	// networks := tview.NewTextView()
-	// networks.SetBorder(true).SetTitle("Docker Networks")
-
-	// wg := sync.WaitGroup{}
-	// wg.Add(3)
-	// go populate(containers, dockerContainers, &wg)
-	// go populate(images, dockerImages, &wg)
-	// go populate(networks, dockerNetworks, &wg)
-	// wg.Wait()
-
-	// Create the left panel that holds the list view
 	leftPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(container.Table, 0, 1, true).
 		AddItem(image.Table, 0, 1, true)
 
 	text := tview.NewTextView()
 	text.SetBorder(true).SetTitle("Docker TUI")
+	text.SetText(string(<-container.Logs))
+
 	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(text, 0, 1, true)
 
@@ -108,24 +72,18 @@ func main() {
 	// Create the application
 	app := tview.NewApplication()
 
-	// with q key we can quit the application
-	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyRune {
-			switch event.Rune() {
-			case 'q':
-				app.Stop()
-			}
-		}
-		return event
-	})
-
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
-		case tcell.KeyTab: // When Tab or Down arrow key is pressed
+		case tcell.KeyTab:
 			if app.GetFocus() == container.Table {
 				app.SetFocus(image.Table)
 			} else {
 				app.SetFocus(container.Table)
+			}
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case 'q':
+				app.Stop()
 			}
 		}
 		return event
@@ -135,18 +93,6 @@ func main() {
 	if err := app.SetRoot(layout, true).Run(); err != nil {
 		panic(err)
 	}
-
-	// println("Docker Images")
-	// dockerImages := <-dockerImages
-	// fmt.Println(dockerImages)
-	//
-	// println("Docker Containers")
-	// dockerContainers := <-dockerContainers
-	// fmt.Println(dockerContainers)
-	//
-	// println("Docker Networks")
-	// dockerNetworks := <-dockerNetworks
-	// fmt.Println(dockerNetworks)
 
 }
 
