@@ -34,13 +34,13 @@ func (c *ContainerUi) PopulateUi(containers []DockerContainer) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	go GetLogs(c.Logs, containers[0].ContainerId, wg)
+	go GetLogs(c.Logs, containers[0].ContainerId, wg, nil)
 	wg.Wait()
 
 	c.Table.SetSelectionChangedFunc(func(row, column int) {
 		containerId := c.Table.GetCell(row, 0).Text
 		wg.Add(1)
-		go GetLogs(c.Logs, containerId, wg)
+		go GetLogs(c.Logs, containerId, wg, nil)
 		wg.Wait()
 	})
 

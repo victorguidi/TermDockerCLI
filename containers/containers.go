@@ -58,8 +58,10 @@ func (c *DockerContainer) GetAllContainers(cc chan []DockerContainer) {
 	cc <- containers
 }
 
-func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {
+func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup, host any) {
 	defer wg.Done()
+
+	// if host, ok := host.(SSH); ok {}
 
 	cmd := exec.Command("docker", "logs", containerId)
 
