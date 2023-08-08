@@ -39,10 +39,22 @@ func (c *ContainerUi) PopulateUi(containers []DockerContainer) {
 
 	c.Table.SetSelectionChangedFunc(func(row, column int) {
 		containerId := c.Table.GetCell(row, 0).Text
-		wg := &sync.WaitGroup{}
 		wg.Add(1)
 		go GetLogs(c.Logs, containerId, wg)
 		wg.Wait()
+	})
+
+	c.Table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyRune {
+			switch event.Rune() {
+			case 'i':
+				containerId := c.GetSelectedContainer()
+				wg.Add(1)
+				go Inspect(c.Logs, containerId, wg)
+				wg.Wait()
+			}
+		}
+		return event
 	})
 
 	c.Table.SetFixed(1, 1)

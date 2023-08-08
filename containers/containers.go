@@ -71,3 +71,17 @@ func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {
 	cl <- logs
 
 }
+
+func Inspect(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	cmd := exec.Command("docker", "inspect", containerId)
+
+	inspect, err := cmd.Output()
+	if err != nil {
+		log.Fatal("Error inspecting container:", err)
+	}
+
+	cl <- inspect
+
+}

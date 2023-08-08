@@ -3,6 +3,7 @@ package main
 // TODO: Change the layout, is to ugly
 // TODO: Return also the containers from ssh connection
 // TODO: Add the possibility to send commands
+// TODO: List images too
 
 import (
 	"log"
@@ -18,6 +19,7 @@ import (
 
 var (
 	dockerContainer = containers.NewContainer()
+	dockerImage     = images.NewImage()
 	container       = containers.NewContainerUi()
 	image           = images.NewImageUi()
 )
@@ -43,30 +45,36 @@ func main() {
 	// CallRoutines()
 
 	containerChannel := make(chan []containers.DockerContainer)
-	go dockerContainer.GetAllContainers(containerChannel)
-	dcontainers := <-containerChannel // FIX: This might cause a deadlock?
+	imageChannel := make(chan []images.DockerImage)
 
-	container.PopulateUi(dcontainers)
-	image.PopulateUi()
+	go dockerContainer.GetAllContainers(containerChannel)
+	go dockerImage.GetImages(imageChannel)
+
+	container.PopulateUi(<-containerChannel)
+	image.PopulateUi(<-imageChannel)
 
 	leftPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(container.Table, 0, 1, true).
 		AddItem(image.Table, 0, 1, true)
 
+		// Set a scrollable text
 	text := tview.NewTextView()
 	text.SetBorder(true).SetTitle("Docker TUI")
+	text.SetScrollable(true)
+
+	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(text, 0, 1, true)
 
 	go func() {
 		for {
 			select {
 			case logs := <-container.Logs:
 				text.SetText(string(logs))
+				// case logs := <-image.Logs:
+				//   text.SetText(string(logs))
 			}
 		}
 	}() // This will start a loop that will wait for logs to be sent to the channel
-
-	rightPanel := tview.NewFlex().SetDirection(tview.FlexRow).
-		AddItem(text, 0, 1, true)
 
 	// Create the layout
 	layout := tview.NewFlex().SetDirection(tview.FlexColumn).
@@ -88,6 +96,8 @@ func main() {
 			}
 		case tcell.KeyRune:
 			switch event.Rune() {
+			case ' ':
+				app.SetFocus(rightPanel)
 			case 'q':
 				app.Stop()
 			}
