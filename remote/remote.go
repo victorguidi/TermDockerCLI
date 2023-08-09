@@ -1,5 +1,11 @@
 package remote
 
+import (
+	"os"
+
+	"github.com/joho/godotenv"
+)
+
 type SSH struct {
 	Host     string
 	User     string
@@ -7,8 +13,17 @@ type SSH struct {
 	Port     int
 }
 
+func init() {
+	godotenv.Load()
+}
+
 func NewSSH() *SSH {
-	return &SSH{}
+	return &SSH{
+		Host:     os.Getenv("REMOTE_HOST"),
+		User:     os.Getenv("REMOTE_USER"),
+		Password: os.Getenv("REMOTE_PASSWORD"),
+		Port:     22,
+	}
 }
 
 func (s *SSH) GetContainerFromRemote() {
