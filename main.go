@@ -1,9 +1,8 @@
 package main
 
 // TODO: Change the layout, is to ugly
-// TODO: Return also the containers from ssh connection
 // TODO: Add the possibility to send commands
-// TODO: List images too
+// TODO: Get the logs of the containers in ssh too
 
 import (
 	"log"
@@ -12,16 +11,18 @@ import (
 
 	"github.com/victorguidi/TermDockerCLI/containers"
 	"github.com/victorguidi/TermDockerCLI/images"
+	"github.com/victorguidi/TermDockerCLI/remote"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
 var (
-	dockerContainer = containers.NewContainer()
-	dockerImage     = images.NewImage()
-	container       = containers.NewContainerUi()
-	image           = images.NewImageUi()
+	dockerContainer  = containers.NewContainer()
+	dockerImage      = images.NewImage()
+	container        = containers.NewContainerUi()
+	image            = images.NewImageUi()
+	remoteContainers = remote.NewSSH()
 )
 
 func init() {
@@ -45,9 +46,11 @@ func main() {
 	// CallRoutines()
 
 	containerChannel := make(chan []containers.DockerContainer)
+	remoteContainersChannel := make(chan []containers.DockerContainer)
 	imageChannel := make(chan []images.DockerImage)
 
 	go dockerContainer.GetAllContainers(containerChannel)
+	go remoteContainers.GetContainerFromRemote(remoteContainersChannel)
 	go dockerImage.GetImages(imageChannel)
 
 	container.PopulateUi(<-containerChannel)
