@@ -11,7 +11,6 @@ import (
 
 	"github.com/victorguidi/TermDockerCLI/containers"
 	"github.com/victorguidi/TermDockerCLI/images"
-	"github.com/victorguidi/TermDockerCLI/remote"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -22,7 +21,7 @@ var (
 	dockerImage      = images.NewImage()
 	container        = containers.NewContainerUi()
 	image            = images.NewImageUi()
-	remoteContainers = remote.NewSSH()
+	remoteContainers = containers.NewSSH()
 )
 
 func init() {
@@ -53,14 +52,28 @@ func main() {
 	go remoteContainers.GetContainerFromRemote(remoteContainersChannel)
 	go dockerImage.GetImages(imageChannel)
 
-	container.PopulateUi(<-containerChannel)
+	container.PopulateUi(<-containerChannel, dockerContainer)
 	image.PopulateUi(<-imageChannel)
 
 	leftPanel := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(container.Table, 0, 1, true).
 		AddItem(image.Table, 0, 1, true)
 
-		// Set a scrollable text
+	leftPanel.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Key() {
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case '1':
+				// FIX: THIS IS CRASHING SINCE THE CHANNEL NOW MIGHT BE NIL
+				container.PopulateUi(<-containerChannel, dockerContainer)
+			case '2':
+				container.PopulateUi(<-remoteContainersChannel, remoteContainers)
+			}
+		}
+		return event
+	})
+
+	// Set a scrollable text
 	text := tview.NewTextView()
 	text.SetBorder(true).SetTitle("Docker TUI")
 	text.SetScrollable(true)

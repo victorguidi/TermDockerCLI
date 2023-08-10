@@ -1,13 +1,13 @@
-package remote
+package containers
 
 import (
 	"encoding/json"
 	"os"
 	"os/user"
 	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
-	"github.com/victorguidi/TermDockerCLI/containers"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
@@ -48,10 +48,21 @@ func NewSSH() *SSH {
 	}
 }
 
-func (s *SSH) GetContainerFromRemote(c chan<- []containers.DockerContainer) {
+// TODO: Migrate all so it keeps connection open and reuse it
+func (s *SSH) OpenConnection(c chan any) {
+	for {
+		client, err := ssh.Dial("tcp", s.Host+":"+s.Port, s.config)
+		if err != nil {
+			panic("Failed to dial: " + err.Error())
+		}
+		c <- client
+	}
+}
+
+func (s *SSH) GetContainerFromRemote(c chan<- []DockerContainer) {
 	defer close(c)
 
-	cmdToRun := `docker ps -a --format '{"ID":"{{.ID}}", "Image":"{{.Image}}"}' | jq -s .`
+	cmdToRun := `docker ps -a --format '{"ContainerID":"{{.ID}}", "Image":"{{.Image}}"}' | jq -s .`
 	client, err := ssh.Dial("tcp", s.Host+":"+s.Port, s.config)
 	if err != nil {
 		panic("Failed to dial: " + err.Error())
@@ -69,14 +80,38 @@ func (s *SSH) GetContainerFromRemote(c chan<- []containers.DockerContainer) {
 	if err != nil {
 		panic("Failed to run: " + err.Error())
 	}
-	var containers []containers.DockerContainer
+	var containers []DockerContainer
 	decoder := json.NewDecoder(strings.NewReader(string(b)))
 	if err := decoder.Decode(&containers); err != nil {
 		panic("Error decoding JSON:" + err.Error())
 	}
 
 	c <- containers
+}
 
+func (s *SSH) GetRemoteLogs(c chan<- []byte, containerId string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	cmdToRun := `docker logs ` + containerId
+	client, err := ssh.Dial("tcp", s.Host+":"+s.Port, s.config)
+	if err != nil {
+		panic("Failed to dial: " + err.Error())
+	}
+
+	session, err := client.NewSession()
+	if err != nil {
+		panic("Failed to create session: " + err.Error())
+	}
+
+	defer session.Close()
+
+	var b []byte
+	b, err = session.Output(cmdToRun)
+	if err != nil {
+		panic("Failed to run: " + err.Error())
+	}
+
+	c <- b
 }
 
 func (s *SSH) GetImagesFromRemote() {}
