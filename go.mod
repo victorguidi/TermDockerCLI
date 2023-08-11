@@ -7,6 +7,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/rivo/tview v0.0.0-20230621164836-6cc0565babaf
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

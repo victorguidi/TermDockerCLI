@@ -1,0 +1,10 @@
+hosts:
+  -
+    ip: 10.10.10
+    user: "user"
+    password: "password"
+  -
+    ip: 10.10.11
+    user: "user1"
+    password: "password"
+
