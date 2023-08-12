@@ -7,4 +7,28 @@ hosts:
     ip: 10.10.11
     user: "user1"
     password: "password"
+  -
+    ip: 10.10.12
+    user: "user2"
+    password: "password"
+  -
+    ip: 10.10.13
+    user: "user3"
+    password: "password"
+  -
+    ip: 10.10.14
+    user: "user4"
+    password: "password"
+  -
+    ip: 10.10.15
+    user: "user5"
+    password: "password"
+  -
+    ip: 10.10.16
+    user: "user6"
+    password: "password"
+  -
+    ip: 10.10.17
+    user: "user7"
+    password: "password"
 

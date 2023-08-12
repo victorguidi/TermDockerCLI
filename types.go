@@ -1,13 +1,5 @@
 package main
 
-import "github.com/rivo/tview"
-
-type FlexBox struct {
-	*tview.Flex
-	Tabs [3]*tview.Table
-	Data chan any
-}
-
 type DockerContainer struct {
 	ContainerId string
 	Image       string
