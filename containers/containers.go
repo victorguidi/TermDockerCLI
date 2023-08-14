@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -21,41 +22,55 @@ func NewContainer() *DockerContainer {
 	return &DockerContainer{}
 }
 
-func (c *DockerContainer) GetAllContainers(cc chan []DockerContainer) {
+func GetAllContainers(cc chan []DockerContainer, host string, ssh any) {
 	defer close(cc)
 
-	cmd := exec.Command("docker", "ps", "-a", "--format", `{"ContainerId":"{{.ID}}", "Image":"{{.Image}}"}`)
-	jqCmd := exec.Command("jq", "-s", ".")
+	if ssh, ok := ssh.(SSH); ok {
+		cmdToRun := `docker ps -a --format '{"ContainerId":"{{.ID}}", "Image":"{{.Image}}"}' | jq -s .`
+		ssh.Channels[host].Command <- cmdToRun
 
-	jqCmd.Stdin, _ = cmd.StdoutPipe()
+		var containers []DockerContainer
+		decoder := json.NewDecoder(strings.NewReader(string(<-ssh.Channels[host].Response)))
+		if err := decoder.Decode(&containers); err != nil {
+			panic("Error decoding JSON:" + err.Error())
+		}
+		cc <- containers
 
-	jqOutput, err := jqCmd.StdoutPipe()
-	if err != nil {
-		log.Fatal("Error creating pipe:", err)
+	} else {
+		cmd := exec.Command("docker", "ps", "-a", "--format", `{"ContainerId":"{{.ID}}", "Image":"{{.Image}}"}`)
+		jqCmd := exec.Command("jq", "-s", ".")
+
+		jqCmd.Stdin, _ = cmd.StdoutPipe()
+
+		jqOutput, err := jqCmd.StdoutPipe()
+		if err != nil {
+			log.Fatal("Error creating pipe:", err)
+		}
+
+		if err := cmd.Start(); err != nil {
+			log.Fatal("Error starting docker command:", err)
+		}
+		if err := jqCmd.Start(); err != nil {
+			log.Fatal("Error starting jq command:", err)
+		}
+
+		var containers []DockerContainer
+		decoder := json.NewDecoder(jqOutput)
+		if err := decoder.Decode(&containers); err != nil {
+			log.Fatal("Error decoding JSON:", err)
+		}
+
+		if err := jqCmd.Wait(); err != nil {
+			log.Fatal("Error waiting for jq command:", err)
+		}
+
+		if err := cmd.Wait(); err != nil {
+			log.Fatal("Error waiting for docker command:", err)
+		}
+
+		cc <- containers
 	}
 
-	if err := cmd.Start(); err != nil {
-		log.Fatal("Error starting docker command:", err)
-	}
-	if err := jqCmd.Start(); err != nil {
-		log.Fatal("Error starting jq command:", err)
-	}
-
-	var containers []DockerContainer
-	decoder := json.NewDecoder(jqOutput)
-	if err := decoder.Decode(&containers); err != nil {
-		log.Fatal("Error decoding JSON:", err)
-	}
-
-	if err := jqCmd.Wait(); err != nil {
-		log.Fatal("Error waiting for jq command:", err)
-	}
-
-	if err := cmd.Wait(); err != nil {
-		log.Fatal("Error waiting for docker command:", err)
-	}
-
-	cc <- containers
 }
 
 func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {

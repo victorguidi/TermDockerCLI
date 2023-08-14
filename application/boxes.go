@@ -9,7 +9,7 @@ import (
 
 func (b *FlexBox) build() {
 
-	page := fmt.Sprintf("Extras - [%d/%d]", b.CurrentPage, len(b.Tabs)-1)
+	page := fmt.Sprintf(" Extras - [%d/%d] ", b.CurrentPage, len(b.Tabs)-1)
 	b.SetBorder(true)
 	b.SetTitle(page)
 	b.SetTitleAlign(tview.AlignLeft)

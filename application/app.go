@@ -5,22 +5,28 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
+	"github.com/victorguidi/TermDockerCLI/containers"
 	"github.com/victorguidi/TermDockerCLI/utils"
 )
 
+// TODO: Load data from dockers
 var (
 	remoteHosts, yerr = utils.ReadYml("config.yml")
-	flexBox           = FlexBox{
+
+	flexBox = FlexBox{
 		Flex:        tview.NewFlex().SetDirection(tview.FlexRow),
 		Data:        make(chan any),
 		Tabs:        [3]*tview.Table{},
 		CurrentPage: 0,
 	}
-	containers = tview.NewBox().SetTitle("Containers").SetBorder(true).SetTitleAlign(tview.AlignLeft)
+
+	dcontainers = tview.NewBox().SetTitle("Containers").SetBorder(true).SetTitleAlign(tview.AlignLeft)
+
 	dockerInfo = DockerInfo{
 		TextView: tview.NewTextView().SetDynamicColors(true).SetRegions(true).SetScrollable(true),
 		Data:     make(chan any),
 	}
+
 	body       = tview.NewFlex().SetDirection(tview.FlexColumn)
 	leftPanel  = tview.NewFlex().SetDirection(tview.FlexRow)
 	rightPanel = tview.NewFlex().SetDirection(tview.FlexRow)
@@ -31,6 +37,7 @@ func init() {
 		panic(yerr)
 	}
 	flexBox.build()
+	containers.NewSSH(remoteHosts)
 }
 
 func NewApplication() *Application {
@@ -47,15 +54,7 @@ func (a *Application) Build() {
 		a.Windows[i] = make(chan any)
 	}
 
-	// Header is a flexbox with tabs for each remote host
-	header := tview.NewFlex().SetDirection(tview.FlexColumn)
-	for i := 0; i < len(remoteHosts.Hosts) && i < 9; i++ {
-		button := tview.NewButton(remoteHosts.Hosts[i].IP)
-		button.SetBorder(true)
-		header.AddItem(button, 0, 1, false)
-	}
-
-	leftPanel.AddItem(containers.SetTitle(fmt.Sprintf("Containers - [10] / tab - [%d/%d]", a.CurrentWindow, len(a.Windows)-1)).SetBorder(true), 0, 1, true)
+	leftPanel.AddItem(dcontainers.SetTitle(fmt.Sprintf("%s: Containers-[10]", remoteHosts.Hosts[a.CurrentWindow].IP)).SetBorder(true), 0, 1, true)
 	leftPanel.AddItem(flexBox, 0, 1, true)
 
 	rightPanel.AddItem(dockerInfo.SetTitle("Docker Info").SetBorder(true), 0, 1, true)
@@ -65,7 +64,6 @@ func (a *Application) Build() {
 
 	// Layout will is a flexbox with a header and a body
 	layout := tview.NewFlex().SetDirection(tview.FlexRow)
-	layout.AddItem(header, 1, 1, false)
 	layout.AddItem(body, 0, 1, true)
 
 	a.SetRoot(layout, true)
@@ -78,39 +76,75 @@ func (a *Application) AddInputCommands() {
 			case 'J': // shift+j move down
 				a.SetFocus(flexBox)
 			case 'K': // shift+k move up
-				a.SetFocus(containers)
+				a.SetFocus(dcontainers)
 			}
 		}
+
 		if event.Key() == tcell.KeyTab {
 			// Switch between the left panel and the right panel with Tab
-			if a.GetFocus() == containers || a.GetFocus() == flexBox {
+			if a.GetFocus() == dcontainers || a.GetFocus() == flexBox {
 				a.SetFocus(dockerInfo)
 			} else {
-				a.SetFocus(containers)
+				a.SetFocus(dcontainers)
 			}
 		}
+
 		if event.Key() == tcell.KeyRune {
 			switch event.Rune() {
 			case '0':
 				a.CurrentWindow = 0
 			case '1':
+				if len(remoteHosts.Hosts) < 1 {
+					break
+				}
 				a.CurrentWindow = 1
 			case '2':
+				if len(remoteHosts.Hosts) < 2 {
+					break
+				}
 				a.CurrentWindow = 2
 			case '3':
+				if len(remoteHosts.Hosts) < 3 {
+					break
+				}
 				a.CurrentWindow = 3
 			case '4':
+				if len(remoteHosts.Hosts) < 4 {
+					break
+				}
 				a.CurrentWindow = 4
 			case '5':
+				if len(remoteHosts.Hosts) < 5 {
+					break
+				}
 				a.CurrentWindow = 5
 			case '6':
+				if len(remoteHosts.Hosts) < 6 {
+					break
+				}
 				a.CurrentWindow = 6
 			case '7':
+				if len(remoteHosts.Hosts) < 7 {
+					break
+				}
 				a.CurrentWindow = 7
 			case '8':
+				if len(remoteHosts.Hosts) < 8 {
+					break
+				}
 				a.CurrentWindow = 8
+			case '9':
+				if len(remoteHosts.Hosts) < 9 {
+					break
+				}
+				a.CurrentWindow = 9
 			}
-			containers.SetTitle(fmt.Sprintf("Containers - [10] / tab - [%d/%d]", a.CurrentWindow, len(a.Windows)-1))
+
+			if a.CurrentWindow == 0 {
+				dcontainers.SetTitle(fmt.Sprintf(" local: Containers-[10] "))
+			} else {
+				dcontainers.SetTitle(fmt.Sprintf(" %s: Containers-[10] ", remoteHosts.Hosts[a.CurrentWindow-1].IP))
+			}
 		}
 		return event
 	})

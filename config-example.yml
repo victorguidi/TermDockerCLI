@@ -31,4 +31,7 @@ hosts:
     ip: 10.10.17
     user: "user7"
     password: "password"
-
+  -
+    ip: 10.10.18
+    user: "user7"
+    password: "password"
