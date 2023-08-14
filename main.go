@@ -14,6 +14,8 @@ func init() {
 		log.Fatal("Docker is not installed, please install docker")
 		return
 	}
+	// Open SSH Connections in case they exist and close them when the application is closed
+
 }
 
 func main() {
