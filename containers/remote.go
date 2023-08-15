@@ -31,7 +31,8 @@ func init() {
 	godotenv.Load()
 }
 
-func NewSSH(remoteHosts types.Config) {
+func NewSSH(remoteHosts types.Config) []*SSH {
+	assh := make([]*SSH, len(remoteHosts.Hosts))
 	var hostKeyCallback ssh.HostKeyCallback
 	hostKeyCallback, err := knownhosts.New("/home/" + u.Username + "/.ssh/known_hosts")
 	if err != nil {
@@ -53,8 +54,15 @@ func NewSSH(remoteHosts types.Config) {
 			},
 			Channels: make(map[string]MapChannels),
 		}
+		ssh.Channels[host.IP] = MapChannels{
+			Host:     host.IP,
+			Command:  make(chan string, 10),
+			Response: make(chan []byte, 10),
+		}
 		go ssh.OpenConnection(ssh.Channels[host.IP])
+		assh = append(assh, &ssh)
 	}
+	return assh
 }
 
 func (s *SSH) OpenConnection(channel MapChannels) {

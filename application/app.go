@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -20,7 +21,8 @@ var (
 		CurrentPage: 0,
 	}
 
-	dcontainers = tview.NewBox().SetTitle("Containers").SetBorder(true).SetTitleAlign(tview.AlignLeft)
+	dcontainers = containers.NewContainerUi()
+	assh        = containers.NewSSH(remoteHosts)
 
 	dockerInfo = DockerInfo{
 		TextView: tview.NewTextView().SetDynamicColors(true).SetRegions(true).SetScrollable(true),
@@ -37,7 +39,6 @@ func init() {
 		panic(yerr)
 	}
 	flexBox.build()
-	containers.NewSSH(remoteHosts)
 }
 
 func NewApplication() *Application {
@@ -50,11 +51,37 @@ func NewApplication() *Application {
 
 func (a *Application) Build() {
 	a.AddInputCommands()
-	for i := 0; i < len(remoteHosts.Hosts) && i < 9; i++ {
+	for i := 0; i < len(remoteHosts.Hosts)+1 && i < 9; i++ {
 		a.Windows[i] = make(chan any)
+		wg := sync.WaitGroup{}
+		go func(i int) {
+			if i == 0 {
+				wg.Add(1)
+				ccontainer := containers.GetAllContainers("local", nil, &wg)
+				a.Windows[i] <- ccontainer
+				wg.Wait()
+			} else {
+				wg.Add(1)
+				ccontainer := containers.GetAllContainers(remoteHosts.Hosts[i-1].IP, assh[i-1], &wg)
+				a.Windows[i] <- ccontainer
+				wg.Wait()
+			}
+		}(i)
 	}
 
-	leftPanel.AddItem(dcontainers.SetTitle(fmt.Sprintf("%s: Containers-[10]", remoteHosts.Hosts[a.CurrentWindow].IP)).SetBorder(true), 0, 1, true)
+	go func() {
+		for {
+			select {
+			case data := <-a.Windows[0]:
+				fmt.Println("data", data)
+				dcontainers.PopulateUi(data.([]containers.DockerContainer), nil)
+			case data := <-a.Windows[1]:
+				dcontainers.PopulateUi(data.([]containers.DockerContainer), assh[0])
+			}
+		}
+	}()
+
+	leftPanel.AddItem(dcontainers.Table, 0, 1, true)
 	leftPanel.AddItem(flexBox, 0, 1, true)
 
 	rightPanel.AddItem(dockerInfo.SetTitle("Docker Info").SetBorder(true), 0, 1, true)
@@ -76,16 +103,16 @@ func (a *Application) AddInputCommands() {
 			case 'J': // shift+j move down
 				a.SetFocus(flexBox)
 			case 'K': // shift+k move up
-				a.SetFocus(dcontainers)
+				a.SetFocus(dcontainers.Table)
 			}
 		}
 
 		if event.Key() == tcell.KeyTab {
 			// Switch between the left panel and the right panel with Tab
-			if a.GetFocus() == dcontainers || a.GetFocus() == flexBox {
+			if a.GetFocus() == dcontainers.Table || a.GetFocus() == flexBox {
 				a.SetFocus(dockerInfo)
 			} else {
-				a.SetFocus(dcontainers)
+				a.SetFocus(dcontainers.Table)
 			}
 		}
 
@@ -141,9 +168,9 @@ func (a *Application) AddInputCommands() {
 			}
 
 			if a.CurrentWindow == 0 {
-				dcontainers.SetTitle(fmt.Sprintf(" local: Containers-[10] "))
+				dcontainers.Table.SetTitle(fmt.Sprintf(" local: Containers-[10] "))
 			} else {
-				dcontainers.SetTitle(fmt.Sprintf(" %s: Containers-[10] ", remoteHosts.Hosts[a.CurrentWindow-1].IP))
+				dcontainers.Table.SetTitle(fmt.Sprintf(" %s: Containers-[10] ", remoteHosts.Hosts[a.CurrentWindow-1].IP))
 			}
 		}
 		return event

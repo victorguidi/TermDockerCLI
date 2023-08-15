@@ -22,8 +22,9 @@ func NewContainer() *DockerContainer {
 	return &DockerContainer{}
 }
 
-func GetAllContainers(cc chan []DockerContainer, host string, ssh any) {
-	defer close(cc)
+func GetAllContainers(host string, ssh any, wg *sync.WaitGroup) <-chan []DockerContainer {
+	defer wg.Done()
+	cc := make(chan []DockerContainer, 100)
 
 	if ssh, ok := ssh.(SSH); ok {
 		cmdToRun := `docker ps -a --format '{"ContainerId":"{{.ID}}", "Image":"{{.Image}}"}' | jq -s .`
@@ -67,10 +68,9 @@ func GetAllContainers(cc chan []DockerContainer, host string, ssh any) {
 		if err := cmd.Wait(); err != nil {
 			log.Fatal("Error waiting for docker command:", err)
 		}
-
 		cc <- containers
 	}
-
+	return cc
 }
 
 func GetLogs(cl chan<- []byte, containerId string, wg *sync.WaitGroup) {
