@@ -49,37 +49,49 @@ func NewApplication() *Application {
 	}
 }
 
-func (a *Application) Build() {
-	a.AddInputCommands()
+func (a *Application) PopulateWindows() {
+	wg := &sync.WaitGroup{}
 	for i := 0; i < len(remoteHosts.Hosts)+1 && i < 9; i++ {
 		a.Windows[i] = make(chan any)
-		wg := sync.WaitGroup{}
 		go func(i int) {
 			if i == 0 {
 				wg.Add(1)
-				ccontainer := containers.GetAllContainers("local", nil, &wg)
-				a.Windows[i] <- ccontainer
+				ccontainer := containers.GetAllContainers("local", nil, wg)
 				wg.Wait()
+				a.Windows[i] <- <-ccontainer
 			} else {
 				wg.Add(1)
-				ccontainer := containers.GetAllContainers(remoteHosts.Hosts[i-1].IP, assh[i-1], &wg)
-				a.Windows[i] <- ccontainer
+				ccontainer := containers.GetAllContainers(remoteHosts.Hosts[i-1].IP, assh[i], wg)
 				wg.Wait()
+				a.Windows[i] <- <-ccontainer
 			}
 		}(i)
 	}
+}
 
+func (a *Application) ListenToDockerContainerChanges() {
 	go func() {
 		for {
 			select {
 			case data := <-a.Windows[0]:
-				fmt.Println("data", data)
-				dcontainers.PopulateUi(data.([]containers.DockerContainer), nil)
+				dcontainers.Table.SetTitle(fmt.Sprintf(" local: Containers-[10] "))
+				if data, ok := data.([]containers.DockerContainer); ok {
+					dcontainers.PopulateUi(data, nil)
+				}
 			case data := <-a.Windows[1]:
-				dcontainers.PopulateUi(data.([]containers.DockerContainer), assh[0])
+				dcontainers.Table.SetTitle(fmt.Sprintf(" %s: Containers-[10] ", remoteHosts.Hosts[0].IP))
+				if data, ok := data.([]containers.DockerContainer); ok {
+					dcontainers.PopulateUi(data, assh[0])
+				}
 			}
 		}
 	}()
+}
+
+func (a *Application) Build() {
+	a.AddInputCommands()
+	a.PopulateWindows()
+	a.ListenToDockerContainerChanges()
 
 	leftPanel.AddItem(dcontainers.Table, 0, 1, true)
 	leftPanel.AddItem(flexBox, 0, 1, true)

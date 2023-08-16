@@ -22,6 +22,8 @@ func NewContainerUi() *ContainerUi {
 }
 
 func (c *ContainerUi) PopulateUi(containers []DockerContainer, host any) {
+	// TODO: Fix why they are appending the data to the table instead of replacing it
+	// c.Table.Clear()
 
 	c.Table.SetBorder(true).SetTitle("Docker Containers")
 	c.Table.SetCell(0, 0, tview.NewTableCell("ID").SetTextColor(tcell.ColorYellow).SetSelectable(false))

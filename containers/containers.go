@@ -26,7 +26,7 @@ func GetAllContainers(host string, ssh any, wg *sync.WaitGroup) <-chan []DockerC
 	defer wg.Done()
 	cc := make(chan []DockerContainer, 100)
 
-	if ssh, ok := ssh.(SSH); ok {
+	if ssh, ok := ssh.(*SSH); ok {
 		cmdToRun := `docker ps -a --format '{"ContainerId":"{{.ID}}", "Image":"{{.Image}}"}' | jq -s .`
 		ssh.Channels[host].Command <- cmdToRun
 
