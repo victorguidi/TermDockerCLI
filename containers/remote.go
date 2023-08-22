@@ -1,6 +1,7 @@
 package containers
 
 import (
+	"fmt"
 	"os/user"
 	"sync"
 
@@ -30,6 +31,9 @@ type MapChannels struct {
 func init() {
 	godotenv.Load()
 }
+
+// 1 go routine for each remote host
+// then 1 go routine for each container in order to get the logs
 
 func NewSSH(remoteHosts types.Config) []*SSH {
 	assh := make([]*SSH, len(remoteHosts.Hosts))
@@ -66,6 +70,7 @@ func NewSSH(remoteHosts types.Config) []*SSH {
 }
 
 func (s *SSH) OpenConnection(channel MapChannels) {
+
 	client, err := ssh.Dial("tcp", s.Host+":"+s.Port, s.config)
 	if err != nil {
 		panic("Failed to dial: " + err.Error())
@@ -76,14 +81,32 @@ func (s *SSH) OpenConnection(channel MapChannels) {
 	}
 	defer session.Close()
 
+	in, err := session.StdinPipe()
+	if err != nil {
+		panic(err)
+	}
+	out, err := session.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+	err = session.Shell()
+
+	// FIXME: Send the command and store each container and log in a map to be used later
 	for {
-		command := <-channel.Command
-		var b []byte
-		b, err = session.Output(command)
-		if err != nil {
-			panic("Failed to run: " + err.Error())
+		select {
+		case command := <-channel.Command:
+			in.Write([]byte(command + "\n"))
+
+			buf := make([]byte, 1024*1024)
+			n, err := out.Read(buf)
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Println("Hello", string(buf[:n]))
+
+			channel.Response <- buf[:n]
 		}
-		channel.Response <- b
 	}
 }
 

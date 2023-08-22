@@ -1,10 +1,11 @@
 package application
 
-import "github.com/rivo/tview"
+import (
+	"github.com/rivo/tview"
+)
 
 type Application struct {
 	*tview.Application
-	Windows       [9]chan any
 	CurrentWindow int
 }
 

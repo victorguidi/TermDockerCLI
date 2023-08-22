@@ -2,9 +2,10 @@ package containers
 
 import (
 	"encoding/json"
+	// "fmt"
 	"log"
 	"os/exec"
-	"strings"
+	// "strings"
 	"sync"
 )
 
@@ -31,10 +32,15 @@ func GetAllContainers(host string, ssh any, wg *sync.WaitGroup) <-chan []DockerC
 		ssh.Channels[host].Command <- cmdToRun
 
 		var containers []DockerContainer
-		decoder := json.NewDecoder(strings.NewReader(string(<-ssh.Channels[host].Response)))
-		if err := decoder.Decode(&containers); err != nil {
-			panic("Error decoding JSON:" + err.Error())
-		}
+
+		// this := strings.NewReader(string(<-ssh.Channels[host].Response))
+		// fmt.Println(this)
+		//
+		// decoder := json.NewDecoder(this)
+		// if err := decoder.Decode(&containers); err != nil {
+		// 	panic("Error decoding JSON:" + err.Error())
+		// }
+
 		cc <- containers
 
 	} else {
